@@ -1,0 +1,26 @@
+<!-- SYNTHETIC LEGACY SAMPLE — illustrative only, not real client code. -->
+<!-- Deployment descriptor for the EMS-WEB-TICKETS module. -->
+<web-app xmlns="http://xmlns.jcp.org/xml/ns/javaee"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://xmlns.jcp.org/xml/ns/javaee http://xmlns.jcp.org/xml/ns/javaee/web-app_3_1.xsd"
+         version="3.1">
+
+    <display-name>EMS-WEB-TICKETS</display-name>
+
+    <servlet>
+        <servlet-name>TicketServlet</servlet-name>
+        <servlet-class>sg.demo.ems.web.TicketServlet</servlet-class>
+    </servlet>
+
+    <servlet-mapping>
+        <servlet-name>TicketServlet</servlet-name>
+        <!-- catch-all mapping; the servlet itself dispatches on an
+             "action" request parameter rather than the URL path -->
+        <url-pattern>/tickets/*</url-pattern>
+    </servlet-mapping>
+
+    <welcome-file-list>
+        <welcome-file>ticket-list.jsp</welcome-file>
+    </welcome-file-list>
+
+</web-app>
