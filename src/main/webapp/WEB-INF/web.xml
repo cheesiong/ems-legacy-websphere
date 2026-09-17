@@ -19,8 +19,34 @@
         <url-pattern>/tickets/*</url-pattern>
     </servlet-mapping>
 
+    <!-- Shared header/footer fragments and pages are UTF-8. -->
+    <jsp-config>
+        <jsp-property-group>
+            <url-pattern>*.jsp</url-pattern>
+            <url-pattern>*.jspf</url-pattern>
+            <page-encoding>UTF-8</page-encoding>
+        </jsp-property-group>
+    </jsp-config>
+
+    <!-- Landing page is the operations dashboard; ticket-list.jsp is still
+         reachable directly and from the side menu. -->
     <welcome-file-list>
+        <welcome-file>dashboard.jsp</welcome-file>
         <welcome-file>ticket-list.jsp</welcome-file>
     </welcome-file-list>
+
+    <!-- NOTE: the error page prints the raw exception message to the user. -->
+    <error-page>
+        <error-code>404</error-code>
+        <location>/error.jsp</location>
+    </error-page>
+    <error-page>
+        <error-code>500</error-code>
+        <location>/error.jsp</location>
+    </error-page>
+    <error-page>
+        <exception-type>java.lang.Throwable</exception-type>
+        <location>/error.jsp</location>
+    </error-page>
 
 </web-app>

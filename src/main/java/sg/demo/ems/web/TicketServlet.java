@@ -13,7 +13,10 @@ import java.io.IOException;
 import java.io.PrintWriter;
 import sg.demo.ems.web.legacydb.LegacyResultSet;
 import sg.demo.ems.web.legacydb.LegacySQLException;
-import java.util.logging.Logger;
+
+// NOTE: Log4j 1.x — end-of-life since 2015, kept deliberately as a
+// modernization finding (EOL dependency with known CVEs).
+import org.apache.log4j.Logger;
 
 import javax.servlet.ServletException;
 import javax.servlet.http.HttpServlet;
@@ -30,12 +33,18 @@ import javax.servlet.http.HttpServletResponse;
  *  - Full request parameters (including resident NRIC and phone number)
  *    are written to the application log on every create.
  *  - No audit trail is written anywhere, including before delete.
+ *  - Logging via Log4j 1.2.17 — end-of-life since 2015, known CVEs.
  *  - SQL built by string concatenation in TicketDAO (see that file).
  *  - Business logic, HTTP handling, and JDBC calls are all in one class.
+ *  - Browser forms pass a "returnTo" parameter and the servlet redirects to
+ *    it verbatim (unvalidated redirect). Without "returnTo" the servlet
+ *    keeps its original plain-text responses (CREATED:/UPDATED:/DELETED:),
+ *    which scripts and curl calls rely on.
+ *  - No CSRF protection on any state-changing action.
  */
 public class TicketServlet extends HttpServlet {
 
-    private static final Logger LOG = Logger.getLogger(TicketServlet.class.getName());
+    private static final Logger LOG = Logger.getLogger(TicketServlet.class);
     private final TicketDAO ticketDAO = new TicketDAO();
 
     @Override
@@ -61,6 +70,9 @@ public class TicketServlet extends HttpServlet {
             try {
                 String ticketId = ticketDAO.insertTicket(estateId, unitId, category, description,
                         residentNric, residentContactNo);
+                if (redirectIfRequested(req, resp, ticketId)) {
+                    return;
+                }
                 resp.setContentType("text/plain");
                 resp.getWriter().println("CREATED:" + ticketId);
             } catch (LegacySQLException e) {
@@ -72,6 +84,9 @@ public class TicketServlet extends HttpServlet {
             String newStatus = req.getParameter("newStatus");
             try {
                 ticketDAO.updateStatus(ticketId, newStatus);
+                if (redirectIfRequested(req, resp, ticketId)) {
+                    return;
+                }
                 resp.getWriter().println("UPDATED:" + ticketId);
             } catch (LegacySQLException e) {
                 throw new ServletException(e);
@@ -82,6 +97,9 @@ public class TicketServlet extends HttpServlet {
             // NOTE: no audit log entry is written before (or after) this call.
             try {
                 ticketDAO.deleteTicket(ticketId);
+                if (redirectIfRequested(req, resp, ticketId)) {
+                    return;
+                }
                 resp.getWriter().println("DELETED:" + ticketId);
             } catch (LegacySQLException e) {
                 throw new ServletException(e);
@@ -115,6 +133,21 @@ public class TicketServlet extends HttpServlet {
         } catch (LegacySQLException e) {
             throw new ServletException(e);
         }
+    }
+
+    /**
+     * Sends the browser back to the page named in "returnTo" (with any
+     * "{ticketId}" placeholder filled in). NOTE: the target is not validated
+     * against an allow-list -- any URL is accepted.
+     */
+    private boolean redirectIfRequested(HttpServletRequest req, HttpServletResponse resp, String ticketId)
+            throws IOException {
+        String returnTo = req.getParameter("returnTo");
+        if (returnTo == null || returnTo.length() == 0) {
+            return false;
+        }
+        resp.sendRedirect(returnTo.replace("{ticketId}", ticketId == null ? "" : ticketId));
+        return true;
     }
 
     private void printRow(PrintWriter out, LegacyResultSet rs) throws LegacySQLException {

@@ -20,6 +20,11 @@ import java.util.regex.Pattern;
  * description or category containing a single-quote character breaks the
  * INSERT the same way it would corrupt or fail against a real database.
  * That is intentional. See UseCase6_migration_spec.md for the fix.
+ *
+ * Also backs two read-only reference tables used by the rest of the EMS
+ * web module (estate directory and term-contractor register): ESTATES and
+ * CONTRACTORS, queried by EstateDAO / ContractorDAO with the same
+ * string-concatenated SELECT shapes. Values are synthetic.
  */
 public final class LegacyDbEngine {
 
@@ -36,6 +41,19 @@ public final class LegacyDbEngine {
     private static final Pattern SELECT_BY_ESTATE = Pattern.compile(
             "SELECT \\* FROM TICKETS WHERE ESTATE_ID = '([^']*)'");
     private static final Pattern SELECT_ALL = Pattern.compile("SELECT \\* FROM TICKETS\\s*");
+
+    // Reference tables (read-only) -- estate directory and contractor register.
+    private static final List<Map<String, String>> ESTATES = new ArrayList<>();
+    private static final List<Map<String, String>> CONTRACTORS = new ArrayList<>();
+
+    private static final Pattern SELECT_REF_ALL = Pattern.compile(
+            "SELECT \\* FROM (ESTATES|CONTRACTORS)\\s*");
+    private static final Pattern SELECT_REF_WHERE = Pattern.compile(
+            "SELECT \\* FROM (ESTATES|CONTRACTORS) WHERE ([A-Z_]+) = '([^']*)'");
+
+    static {
+        seedReferenceData();
+    }
 
     private LegacyDbEngine() {
     }
@@ -100,6 +118,66 @@ public final class LegacyDbEngine {
         row.put("STATUS", status);
         row.put("OPENED_DATE", openedDate);
         TICKETS.add(row);
+    }
+
+    /**
+     * Synthetic reference data: six estates (EST-01..EST-06, the same IDs the
+     * ticket rows use) and one term contractor per ticket category (the same
+     * seven categories ticket-form.jsp offers). Names, addresses and contacts
+     * are invented for the demo.
+     */
+    private static synchronized void seedReferenceData() {
+        if (!ESTATES.isEmpty()) {
+            return;
+        }
+        addEstate("EST-01", "Maple Grove", "North", "8", "640", "1998", "Blk 101 Maple Grove Walk #01-10", "Rachel Lim", "6555 0101");
+        addEstate("EST-02", "Harbour View", "South", "12", "1104", "1987", "Blk 215 Harbour View Road #01-02", "Daniel Ong", "6555 0102");
+        addEstate("EST-03", "Cedar Heights", "West", "10", "880", "2004", "Blk 330 Cedar Heights Avenue #01-18", "Priya Nair", "6555 0103");
+        addEstate("EST-04", "Riverside Park", "East", "6", "452", "2012", "Blk 12 Riverside Park Lane #01-05", "Ahmad Rahman", "6555 0104");
+        addEstate("EST-05", "Kingfisher Court", "North-East", "9", "756", "1993", "Blk 508 Kingfisher Court #01-21", "Grace Teo", "6555 0105");
+        addEstate("EST-06", "Sunrise Terrace", "Central", "5", "390", "2016", "Blk 7 Sunrise Terrace #01-01", "Marcus Wong", "6555 0106");
+
+        addContractor("CON-101", "Kestrel Lift Engineering", "Lift Fault", "Benjamin Koh", "6555 0201", "service@kestrel-lift.example.com", "2", "3", "2024-04-01", "2027-03-31", "4.2");
+        addContractor("CON-102", "BlueWave Plumbing Works", "Plumbing", "Siti Aminah", "6555 0202", "jobs@bluewave-plumbing.example.com", "4", "5", "2023-07-01", "2026-10-31", "3.8");
+        addContractor("CON-103", "Voltline Electrical Services", "Electrical", "Kumar Raj", "6555 0203", "ops@voltline.example.com", "2", "3", "2025-01-01", "2027-12-31", "4.5");
+        addContractor("CON-104", "GreenShield Pest Management", "Pest Control", "Wendy Chua", "6555 0204", "hello@greenshield-pest.example.com", "24", "7", "2024-09-01", "2026-11-30", "4.0");
+        addContractor("CON-105", "Stonebridge Building Repairs", "Structural/Ceiling", "Victor Lee", "6555 0205", "works@stonebridge-repairs.example.com", "48", "21", "2022-06-01", "2027-05-31", "3.6");
+        addContractor("CON-106", "Lumen Facility Lighting", "Common Area Lighting", "Nurul Huda", "6555 0206", "desk@lumen-lighting.example.com", "12", "5", "2025-03-01", "2028-02-29", "4.4");
+        addContractor("CON-107", "GateGuard Access Systems", "Car Park Barrier", "Alan Goh", "6555 0207", "support@gateguard.example.com", "4", "2", "2024-01-01", "2026-12-31", "4.1");
+    }
+
+    private static void addEstate(String estateId, String name, String region, String blocks, String units,
+                                  String yearCompleted, String officeAddress, String officerName, String officePhone) {
+        Map<String, String> row = new LinkedHashMap<>();
+        row.put("ESTATE_ID", estateId);
+        row.put("ESTATE_NAME", name);
+        row.put("REGION", region);
+        row.put("BLOCK_COUNT", blocks);
+        row.put("UNIT_COUNT", units);
+        row.put("YEAR_COMPLETED", yearCompleted);
+        row.put("OFFICE_ADDRESS", officeAddress);
+        row.put("OFFICER_NAME", officerName);
+        row.put("OFFICE_PHONE", officePhone);
+        row.put("OFFICE_HOURS", "Mon-Fri 8:30am-5:00pm");
+        ESTATES.add(row);
+    }
+
+    private static void addContractor(String contractorId, String company, String category, String contactPerson,
+                                      String phone, String email, String responseHours, String resolutionDays,
+                                      String contractStart, String contractEnd, String rating) {
+        Map<String, String> row = new LinkedHashMap<>();
+        row.put("CONTRACTOR_ID", contractorId);
+        row.put("COMPANY_NAME", company);
+        row.put("CATEGORY", category);
+        row.put("CONTACT_PERSON", contactPerson);
+        row.put("CONTACT_PHONE", phone);
+        row.put("CONTACT_EMAIL", email);
+        row.put("RESPONSE_HOURS", responseHours);
+        row.put("RESOLUTION_DAYS", resolutionDays);
+        row.put("CONTRACT_START", contractStart);
+        row.put("CONTRACT_END", contractEnd);
+        row.put("RATING", rating);
+        CONTRACTORS.add(row);
     }
 
     public static LegacyConnection connect() {
@@ -182,6 +260,28 @@ public final class LegacyDbEngine {
             return new LegacyResultSet(new ArrayList<>(TICKETS));
         }
 
+        m = SELECT_REF_ALL.matcher(sql);
+        if (m.matches()) {
+            return new LegacyResultSet(new ArrayList<>(refTable(m.group(1))));
+        }
+
+        m = SELECT_REF_WHERE.matcher(sql);
+        if (m.matches()) {
+            String column = m.group(2);
+            String value = m.group(3);
+            List<Map<String, String>> result = new ArrayList<>();
+            for (Map<String, String> row : refTable(m.group(1))) {
+                if (value.equals(row.get(column))) {
+                    result.add(row);
+                }
+            }
+            return new LegacyResultSet(result);
+        }
+
         throw new LegacySQLException("SQL parse error (unrecognized statement): " + sql);
+    }
+
+    private static List<Map<String, String>> refTable(String name) {
+        return "ESTATES".equals(name) ? ESTATES : CONTRACTORS;
     }
 }

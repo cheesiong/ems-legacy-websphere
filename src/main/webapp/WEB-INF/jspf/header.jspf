@@ -1,0 +1,197 @@
+<%--
+  SYNTHETIC LEGACY SAMPLE — illustrative only, not real client code.
+  Shared page header for every EMS screen: top bar, notification and user
+  menus, side navigation, flash message. Statically included (<%@ include %>)
+  so it shares scriptlet variables with the including page, which must
+  declare two Strings before the include:
+      pageTitle  - text for <title> and the breadcrumb
+      activeNav  - dashboard | tickets | new | estates | contractors | reports | help
+
+  Known issues (deliberately left in for the modernization spec to catch):
+   - Runs a full-table ticket query on EVERY page view just to draw the
+     badge counts (no caching).
+   - "Signed-in" user comes from an unauthenticated session attribute with
+     a hard-coded fallback identity; no page actually requires login.
+   - Request parameters (q, ticketId) are echoed back unescaped.
+--%>
+<%@ page contentType="text/html; charset=UTF-8" %>
+<%@ page import="java.util.*" %>
+<%@ page import="sg.demo.ems.web.TicketDAO" %>
+<%@ page import="sg.demo.ems.web.ViewUtil" %>
+<%
+    String ctx = request.getContextPath();
+    String emsUser = (String) session.getAttribute("emsUser");
+    String emsRole = (String) session.getAttribute("emsRole");
+    if (emsUser == null) { emsUser = "Jasmine Tan"; }
+    if (emsRole == null) { emsRole = "Estate Officer"; }
+
+    // NOTE: full ticket scan on every request, from the view layer.
+    List hdrPending = new ArrayList();
+    int hdrTotal = 0;
+    try {
+        List hdrAll = ViewUtil.readTickets(new TicketDAO().listByEstate(null));
+        hdrTotal = hdrAll.size();
+        for (int hi = 0; hi < hdrAll.size(); hi++) {
+            Map hr = (Map) hdrAll.get(hi);
+            if (!"Closed".equals(hr.get("status"))) { hdrPending.add(hr); }
+        }
+        ViewUtil.sortByOpenedDesc(hdrPending);
+        Collections.reverse(hdrPending); // oldest first
+    } catch (RuntimeException hdrEx) {
+        // swallow -- header must render even if the "database" is unhappy
+    }
+    String hdrQ = request.getParameter("q");
+    String flash = request.getParameter("msg");
+%>
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title><%= pageTitle %> | EMS - Estate Maintenance System</title>
+  <link rel="icon" type="image/svg+xml" href="<%= ctx %>/assets/favicon.svg">
+  <link rel="stylesheet" href="<%= ctx %>/assets/ems.css">
+</head>
+<body>
+
+<header class="topbar">
+  <a class="brand" href="<%= ctx %>/dashboard.jsp">
+    <span class="brand-mark">
+      <svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 20V9l4-2.5V20M9 20V4l6 3.5V20M15 20V10l4 2v8M3 20h18"/></svg>
+    </span>
+    <span><span class="brand-name">EMS</span><span class="brand-sub">Estate Maintenance System</span></span>
+  </a>
+  <button class="menu-toggle" type="button" aria-label="Toggle menu">
+    <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 7h16M4 12h16M4 17h16"/></svg>
+  </button>
+
+  <form class="search" action="<%= ctx %>/ticket-list.jsp" method="get" role="search">
+    <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg>
+    <%-- NOTE: search term reflected into the page without encoding. --%>
+    <input type="search" name="q" value="<%= hdrQ == null ? "" : hdrQ %>" placeholder="Search tickets by ID, unit or description" aria-label="Search tickets">
+  </form>
+
+  <div class="topbar-right">
+    <span class="env-pill">PRODUCTION</span>
+
+    <div class="dropdown">
+      <button class="icon-btn" type="button" data-dropdown aria-label="Notifications">
+        <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.7 21a2 2 0 0 1-3.4 0"/></svg>
+        <% if (hdrPending.size() > 0) { %><span class="dot-count"><%= hdrPending.size() %></span><% } %>
+      </button>
+      <div class="dropdown-panel">
+        <div class="dropdown-head">Awaiting action <span class="muted"><%= hdrPending.size() %> tickets</span></div>
+<%
+    for (int ni = 0; ni < hdrPending.size() && ni < 4; ni++) {
+        Map nr = (Map) hdrPending.get(ni);
+%>
+        <a class="dropdown-item" href="<%= ctx %>/ticket-detail.jsp?ticketId=<%= nr.get("ticket_id") %>">
+          <span class="cat-tile"><%= ViewUtil.categoryIcon((String) nr.get("category")) %></span>
+          <span><b><%= nr.get("ticket_id") %> &middot; <%= nr.get("category") %></b>
+            <small>Open <%= ViewUtil.daysOpen((String) nr.get("opened_date")) %> days &middot; <%= nr.get("estate_id") %> / <%= nr.get("unit_id") %></small></span>
+        </a>
+<%
+    }
+%>
+        <a class="dropdown-foot" href="<%= ctx %>/ticket-list.jsp?status=Open">View all open tickets</a>
+      </div>
+    </div>
+
+    <div class="dropdown">
+      <button class="user-btn" type="button" data-dropdown>
+        <span class="avatar"><%= ViewUtil.initials(emsUser) %></span>
+        <span class="user-meta"><b><%= emsUser %></b><span><%= emsRole %></span></span>
+        <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 9l6 6 6-6"/></svg>
+      </button>
+      <div class="dropdown-panel" style="width:220px">
+        <div class="dropdown-head"><span><%= emsUser %><br><small class="muted" style="font-weight:400"><%= emsRole %></small></span></div>
+        <a class="dropdown-item" href="<%= ctx %>/help.jsp#about">About EMS</a>
+        <a class="dropdown-item" href="<%= ctx %>/help.jsp">Help &amp; support</a>
+        <a class="dropdown-item" href="<%= ctx %>/login.jsp?action=logout">Sign out</a>
+      </div>
+    </div>
+  </div>
+</header>
+
+<div class="shell">
+  <aside class="sidebar">
+    <div class="nav-section">Operations</div>
+    <a class="nav-link<%= "dashboard".equals(activeNav) ? " active" : "" %>" href="<%= ctx %>/dashboard.jsp">
+      <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"><rect x="3" y="3" width="7" height="9" rx="1.5"/><rect x="14" y="3" width="7" height="5" rx="1.5"/><rect x="14" y="12" width="7" height="9" rx="1.5"/><rect x="3" y="16" width="7" height="5" rx="1.5"/></svg>
+      Dashboard
+    </a>
+    <a class="nav-link<%= "tickets".equals(activeNav) || "new".equals(activeNav) ? " active" : "" %>" href="<%= ctx %>/ticket-list.jsp">
+      <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v2a2 2 0 0 0 0 4v2a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2v-2a2 2 0 0 0 0-4z"/><path d="M14 5v12"/></svg>
+      Tickets <span class="count"><%= hdrTotal %></span>
+    </a>
+    <% if ("tickets".equals(activeNav) || "new".equals(activeNav)) { %>
+    <div class="nav-sub">
+      <a class="<%= "tickets".equals(activeNav) ? "active" : "" %>" href="<%= ctx %>/ticket-list.jsp">All tickets</a>
+      <a href="<%= ctx %>/ticket-list.jsp?status=Open">Open</a>
+      <a class="<%= "new".equals(activeNav) ? "active" : "" %>" href="<%= ctx %>/ticket-form.jsp">Raise a ticket</a>
+    </div>
+    <% } %>
+    <a class="nav-link<%= "estates".equals(activeNav) ? " active" : "" %>" href="<%= ctx %>/estates.jsp">
+      <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 21V8l6-4v17M10 21V9l10 4v8M2 21h20M7 10v.01M7 13v.01M7 16v.01M14 14v.01M17 15v.01M14 17v.01M17 18v.01"/></svg>
+      Estates
+    </a>
+    <a class="nav-link<%= "contractors".equals(activeNav) ? " active" : "" %>" href="<%= ctx %>/contractors.jsp">
+      <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14.7 6.3a4 4 0 0 0-5.4 5.4L3 18l3 3 6.3-6.3a4 4 0 0 0 5.4-5.4l-2.5 2.5-2.4-.6-.6-2.4z"/></svg>
+      Contractors
+    </a>
+    <a class="nav-link<%= "reports".equals(activeNav) ? " active" : "" %>" href="<%= ctx %>/reports.jsp">
+      <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/></svg>
+      Reports
+    </a>
+
+    <div class="nav-section">Support</div>
+    <a class="nav-link<%= "help".equals(activeNav) ? " active" : "" %>" href="<%= ctx %>/help.jsp">
+      <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M9.5 9a2.5 2.5 0 1 1 3.5 2.3c-.6.3-1 .9-1 1.6V14M12 17v.01"/></svg>
+      Help &amp; FAQ
+    </a>
+    <a class="nav-link" href="<%= ctx %>/help.jsp#about">
+      <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="M12 11v6M12 7.5v.01"/></svg>
+      About EMS
+    </a>
+
+    <div class="sidebar-card">
+      <b>EMS Helpdesk</b>
+      6555 0100 &middot; ext 2<br>
+      Mon&ndash;Fri, 8:30am&ndash;6:00pm<br>
+      <a href="<%= ctx %>/help.jsp#contact">Contact support</a>
+    </div>
+  </aside>
+
+  <div class="main">
+    <main class="content">
+<%
+    if ("created".equals(flash)) {
+%>
+      <div class="alert alert-success" data-flash>
+        <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="M8 12l3 3 5-6"/></svg>
+        <div><b>Ticket <%= request.getParameter("ticketId") %> raised</b>The resident's request has been logged and routed to the term contractor.</div>
+      </div>
+<%
+    } else if ("updated".equals(flash)) {
+%>
+      <div class="alert alert-success" data-flash>
+        <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="M8 12l3 3 5-6"/></svg>
+        <div><b>Status updated</b>Ticket <%= request.getParameter("ticketId") %> has been updated.</div>
+      </div>
+<%
+    } else if ("deleted".equals(flash)) {
+%>
+      <div class="alert alert-warn" data-flash>
+        <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3"/></svg>
+        <div><b>Ticket deleted</b>Ticket <%= request.getParameter("ticketId") %> was permanently removed.</div>
+      </div>
+<%
+    } else if ("welcome".equals(flash)) {
+%>
+      <div class="alert alert-info" data-flash>
+        <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="M12 11v6M12 7.5v.01"/></svg>
+        <div><b>Welcome back, <%= emsUser %></b>You have <%= hdrPending.size() %> tickets awaiting action.</div>
+      </div>
+<%
+    }
+%>

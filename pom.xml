@@ -27,6 +27,17 @@
       <version>3.1.0</version>
       <scope>provided</scope>
     </dependency>
+    <!-- DELIBERATE end-of-life dependency for the demo:
+         Log4j 1.x reached EOL in Aug 2015 and has known CVEs
+         (e.g. CVE-2019-17571 SocketServer deserialization, CVE-2021-4104
+         JMSAppender). Ships in WEB-INF/lib so it shows up as a utility JAR
+         in the scanner inventory and as CVE findings in OWASP
+         Dependency-Check (scripts/5_run_dependency_check.sh). -->
+    <dependency>
+      <groupId>log4j</groupId>
+      <artifactId>log4j</artifactId>
+      <version>1.2.17</version>
+    </dependency>
   </dependencies>
 
   <build>

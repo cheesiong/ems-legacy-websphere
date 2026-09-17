@@ -1,0 +1,34 @@
+<%--
+  SYNTHETIC LEGACY SAMPLE — illustrative only, not real client code.
+  Shared page footer. Closes the layout opened by header.jspf.
+
+  Known issues (deliberately left in for the modernization spec to catch):
+   - Discloses the exact application-server product/version and Java
+     version to every visitor (information disclosure). Handy for the
+     WebSphere 9 vs Liberty side-by-side, not something to keep.
+--%>
+    </main>
+
+    <footer class="footer">
+      <div class="footer-row">
+        <div class="footer-links">
+          <a href="<%= ctx %>/help.jsp#about">About EMS</a>
+          <a href="<%= ctx %>/help.jsp">Help &amp; FAQ</a>
+          <a href="<%= ctx %>/help.jsp#contact">Contact support</a>
+          <a href="<%= ctx %>/help.jsp#privacy">Privacy statement</a>
+          <a href="<%= ctx %>/help.jsp#terms">Terms of use</a>
+        </div>
+        <span class="runtime" title="Application server serving this page">
+          <i></i> <%= application.getServerInfo() %> &middot; Java <%= System.getProperty("java.version") %>
+        </span>
+      </div>
+      <div class="footer-row footer-note">
+        <span>&copy; 2011&ndash;2026 Estate Maintenance System &middot; EMS-WEB-TICKETS v1.0.0 (build 2019.11.4)</span>
+        <span>Synthetic demonstration system &middot; all estates, residents and contractors are fictitious</span>
+      </div>
+    </footer>
+  </div>
+</div>
+<script src="<%= ctx %>/assets/ems.js"></script>
+</body>
+</html>
